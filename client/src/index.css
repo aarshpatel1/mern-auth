@@ -1,0 +1,7 @@
+#form-container {
+    height: calc(100dvh - 56px);
+}
+
+form {
+    transition: all 0.3s linear;
+}
