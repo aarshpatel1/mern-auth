@@ -74,13 +74,23 @@ export const login = async (req, res) => {
 	try {
 		const errors = validationResult(req);
 		if (!errors.isEmpty()) {
-			return res.status(400).json({
-				errors: errors.array().map((err) => ({
-					field: err.path,
-					message: err.msg,
-					value: req.body[err.path] || "",
-				})),
+			let grouped = {};
+
+			errors.array().forEach((err) => {
+				if (!grouped[err.path]) {
+					grouped[err.path] = {
+						field: err.path,
+						messages: [],
+						value: req.body[err.path] || "",
+					};
+				}
+				grouped[err.path].messages.push(err.msg);
 			});
+
+			// convert grouped object → array format you want
+			const finalErrors = Object.values(grouped);
+
+			return res.status(400).json({ errors: finalErrors });
 		}
 
 		const { email, password } = req.body;
