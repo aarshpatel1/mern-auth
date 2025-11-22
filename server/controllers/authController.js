@@ -14,7 +14,11 @@ export const signup = async (req, res) => {
 		const errors = validationResult(req);
 		if (!errors.isEmpty()) {
 			return res.status(400).json({
-				errors: errors.array(),
+				errors: errors.array().map((err) => ({
+					field: err.path,
+					message: err.msg,
+					value: req.body[err.path] || "",
+				})),
 			});
 		}
 
@@ -22,9 +26,15 @@ export const signup = async (req, res) => {
 
 		const checkExistingUser = await User.findOne({ email });
 		if (checkExistingUser) {
-			return res
-				.status(400)
-				.json({ message: "User already exists, login instead..!!" });
+			return res.status(400).json({
+				errors: [
+					{
+						field: "email",
+						message: "User already exists, login instead..!!",
+						value: email,
+					},
+				],
+			});
 		}
 
 		const newUser = await User.create({ username, email, password });
@@ -55,7 +65,11 @@ export const login = async (req, res) => {
 		const errors = validationResult(req);
 		if (!errors.isEmpty()) {
 			return res.status(400).json({
-				errors: errors.array(),
+				errors: errors.array().map((err) => ({
+					field: err.path,
+					message: err.msg,
+					value: req.body[err.path] || "",
+				})),
 			});
 		}
 
@@ -63,27 +77,33 @@ export const login = async (req, res) => {
 
 		const user = await User.findOne({ email });
 		if (!user) {
-			return res
-				.status(400)
-				.json({ message: "User not found, signup instead..!!" });
+			return res.status(400).json({
+				errors: [
+					{
+						field: "email",
+						message: "User not found, signup instead..!!",
+						value: email,
+					},
+				],
+			});
 		}
 
 		const isMatch = await user.comparePassword(password);
 		if (!isMatch) {
-			return res
-				.status(400)
-				.json({ message: "Please enter the correct password..!!" });
+			return res.status(400).json({
+				errors: [
+					{
+						field: "password",
+						message: "Please enter the correct password..!!",
+						value: password,
+					},
+				],
+			});
 		}
 
-		const token = jwt.sign(
-			{
-				id: user._id,
-			},
-			JWT_SECRET,
-			{
-				expiresIn: "1h",
-			}
-		);
+		const token = jwt.sign({ id: user._id }, JWT_SECRET, {
+			expiresIn: "1h",
+		});
 
 		return res.status(200).json({
 			message: "Logged In Successfully..!!",

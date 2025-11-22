@@ -9,6 +9,7 @@ export const signupValidator = [
 		.withMessage("Username must not contain spaces")
 		.isLength({ min: 3, max: 30 })
 		.withMessage("Username length must be 3-30"),
+
 	body("email")
 		.trim()
 		.notEmpty()
@@ -17,13 +18,19 @@ export const signupValidator = [
 		.withMessage("Invalid email format")
 		.matches(/^[^\s]+$/)
 		.withMessage("Email must not contain spaces"),
+
 	body("password")
 		.notEmpty()
 		.withMessage("Password is required")
 		.isLength({ min: 8 })
 		.withMessage("Password must be at least 8 characters")
+		.matches(/^(?=.*[A-Z])(?=.*[a-z])(?=.*\d)(?=.*[\W_]).+$/)
+		.withMessage(
+			"Password must include uppercase, lowercase, number, and symbol"
+		)
 		.matches(/^[^\s]+$/)
 		.withMessage("Password must not contain spaces"),
+
 	body("confirmPassword").custom((value, { req }) => {
 		if (value !== req.body.password) {
 			throw new Error("Passwords do not match");
@@ -41,6 +48,7 @@ export const loginValidator = [
 		.withMessage("Invalid email format")
 		.matches(/^[^\s]+$/)
 		.withMessage("Email must not contain spaces"),
+
 	body("password")
 		.notEmpty()
 		.withMessage("Password is required")
