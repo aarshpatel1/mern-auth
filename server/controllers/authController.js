@@ -1,7 +1,7 @@
 import User from "../models/User.js";
-
 import jwt from "jsonwebtoken";
 import { configDotenv } from "dotenv";
+import { validationResult } from "express-validator";
 
 configDotenv({
 	quiet: true,
@@ -11,64 +11,27 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 export const signup = async (req, res) => {
 	try {
-		const { username, email, password, confirmPassword } = req.body;
-
-		if (!username) {
+		const errors = validationResult(req);
+		if (!errors.isEmpty()) {
 			return res.status(400).json({
-				message: "Please enter the username..!!",
+				errors: errors.array(),
 			});
 		}
 
-		if (!email) {
-			return res.status(400).json({
-				message: "Please enter the email..!!",
-			});
-		}
-
-		if (!password) {
-			return res.status(400).json({
-				message: "Please enter the password..!!",
-			});
-		}
-
-		if (!confirmPassword) {
-			return res.status(400).json({
-				message: "Please enter the confirmPassword..!!",
-			});
-		}
-
-		if (password !== confirmPassword) {
-			return res.status(400).json({
-				message:
-					"Password and the Confirm Password should be the same..!!",
-			});
-		}
+		const { username, email, password } = req.body;
 
 		const checkExistingUser = await User.findOne({ email });
 		if (checkExistingUser) {
-			return res.status(400).json({
-				message: "User already exists, login instead..!!",
-			});
+			return res
+				.status(400)
+				.json({ message: "User already exists, login instead..!!" });
 		}
 
-		const user = {
-			username,
-			email,
-			password,
-		};
+		const newUser = await User.create({ username, email, password });
 
-		const newUser = await User.create(user);
-
-		// Generate token
-		const token = jwt.sign(
-			{
-				id: newUser._id,
-			},
-			JWT_SECRET,
-			{
-				expiresIn: "1h",
-			}
-		);
+		const token = jwt.sign({ id: newUser._id }, JWT_SECRET, {
+			expiresIn: "1h",
+		});
 
 		return res.status(201).json({
 			message: "Signed Up Successfully..!!",
@@ -89,19 +52,14 @@ export const signup = async (req, res) => {
 
 export const login = async (req, res) => {
 	try {
+		const errors = validationResult(req);
+		if (!errors.isEmpty()) {
+			return res.status(400).json({
+				errors: errors.array(),
+			});
+		}
+
 		const { email, password } = req.body;
-
-		if (!email) {
-			return res.status(400).json({
-				message: "Please enter the email..!!",
-			});
-		}
-
-		if (!password) {
-			return res.status(400).json({
-				message: "Please enter the password..!!",
-			});
-		}
 
 		const user = await User.findOne({ email });
 		if (!user) {

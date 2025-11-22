@@ -1,4 +1,5 @@
 import { signup, login, failedLogin } from "../controllers/authController.js";
+import { loginValidator, signupValidator } from "../utils/validation.js";
 
 import express from "express";
 
@@ -10,8 +11,8 @@ router.get("/", (req, res) => {
 	});
 });
 
-router.post("/signup", signup);
-router.post("/login", login);
+router.post("/signup", signupValidator, signup);
+router.post("/login", loginValidator, login);
 router.get("/failedLogin", failedLogin);
 
 export default router;
