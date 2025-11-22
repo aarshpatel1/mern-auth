@@ -1,5 +1,5 @@
 import { signup, login, failedLogin } from "../controllers/authController.js";
-import { loginValidator, signupValidator } from "../utils/validation.js";
+import { loginValidator, signupValidator } from "../utils/validator.js";
 
 import express from "express";
 
