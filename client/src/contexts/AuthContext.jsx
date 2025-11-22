@@ -1,33 +1,62 @@
-import { createContext, useState, useEffect } from "react";
+import { createContext, useState, useEffect, useCallback } from "react";
 import { authService } from "../api/authConfig";
 
-export const AuthContext = createContext();
+export const AuthContext = createContext(null);
+
+const decodeJwt = (token) => {
+	if (!token) return null;
+	try {
+		const payload = token.split(".")[1];
+		if (!payload) return null;
+		return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+	} catch {
+		return null;
+	}
+};
+
+const isExpired = (token) => {
+	const payload = decodeJwt(token);
+	if (!payload?.exp) return false;
+	return Date.now() >= payload.exp * 1000;
+};
 
 export function AuthProvider({ children }) {
-	const [user, setUser] = useState(null);
+	const [token, setToken] = useState(authService.getToken());
+	const [user, setUser] = useState(authService.getUser());
 	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState(null);
+	const [error, setError] = useState("");
 
-	useEffect(() => {
-		const storedUser = authService.getUser();
-		if (storedUser) {
-			setUser(storedUser);
-		}
+	const persist = (t, u) => {
+		if (t) localStorage.setItem("token", t);
+		if (u) localStorage.setItem("user", JSON.stringify(u));
+	};
+
+	const clearPersisted = () => {
+		localStorage.removeItem("token");
+		localStorage.removeItem("user");
+	};
+
+	const logout = useCallback(() => {
+		clearPersisted();
+		setToken(null);
+		setUser(null);
+		setError("");
 	}, []);
 
-	const signup = async (userData) => {
+	const signup = async (formData) => {
 		setLoading(true);
-		setError(null);
+		setError("");
 		try {
-			const data = await authService.signup(userData);
-			localStorage.setItem("token", data.token);
-			localStorage.setItem("user", JSON.stringify(data.user));
+			const data = await authService.signup(formData);
+			if (!data?.token || !data?.user)
+				throw new Error("Invalid signup response.");
+			setToken(data.token);
 			setUser(data.user);
+			persist(data.token, data.user);
 			return data;
-		} catch (err) {
-			const errorMessage = err.response?.data?.message || "Signup failed";
-			setError(errorMessage);
-			throw err;
+		} catch (e) {
+			setError(e.message || "Signup failed.");
+			throw e;
 		} finally {
 			setLoading(false);
 		}
@@ -35,40 +64,80 @@ export function AuthProvider({ children }) {
 
 	const login = async (credentials) => {
 		setLoading(true);
-		setError(null);
+		setError("");
 		try {
 			const data = await authService.login(credentials);
-			localStorage.setItem("token", data.token);
-			localStorage.setItem("user", JSON.stringify(data.user));
+			if (!data?.token || !data?.user)
+				throw new Error("Invalid login response.");
+			setToken(data.token);
 			setUser(data.user);
+			persist(data.token, data.user);
 			return data;
-		} catch (err) {
-			const errorMessage = err.response?.data?.message || "Login failed";
-			setError(errorMessage);
-			throw err;
+		} catch (e) {
+			setError(e.message || "Login failed.");
+			throw e;
 		} finally {
 			setLoading(false);
 		}
 	};
 
-	const logout = () => {
-		authService.logout();
-		setUser(null);
-		setError(null);
+	const refreshProfile = useCallback(async () => {
+		if (!token) return;
+		if (isExpired(token)) {
+			logout();
+			return;
+		}
+		setLoading(true);
+		try {
+			const data = await authService.getProfile();
+			if (data?.user) {
+				setUser(data.user);
+				persist(token, data.user);
+			}
+		} catch (e) {
+			if (e?.response?.status === 401) {
+				logout();
+			}
+		} finally {
+			setLoading(false);
+		}
+	}, [token, logout]);
+
+	// Initial load
+	useEffect(() => {
+		if (token && !user) {
+			refreshProfile();
+		} else if (token && isExpired(token)) {
+			logout();
+		}
+	}, [token, user, refreshProfile, logout]);
+
+	// Cross-tab sync
+	useEffect(() => {
+		const handleStorage = () => {
+			const newToken = authService.getToken();
+			const newUser = authService.getUser();
+			setToken(newToken);
+			setUser(newUser);
+			if (newToken && isExpired(newToken)) logout();
+		};
+		window.addEventListener("storage", handleStorage);
+		return () => window.removeEventListener("storage", handleStorage);
+	}, [logout]);
+
+	const value = {
+		token,
+		user,
+		loading,
+		error,
+		login,
+		signup,
+		logout,
+		refreshProfile,
+		isAuthenticated: !!token && !!user && !isExpired(token),
 	};
 
 	return (
-		<AuthContext.Provider
-			value={{
-				user,
-				loading,
-				error,
-				signup,
-				login,
-				logout,
-			}}
-		>
-			{children}
-		</AuthContext.Provider>
+		<AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 	);
 }

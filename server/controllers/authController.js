@@ -47,6 +47,20 @@ export const signup = async (req, res) => {
 			});
 		}
 
+		const checkExistingUsername = await User.findOne({ username });
+		if (checkExistingUsername) {
+			return res.status(400).json({
+				errors: [
+					{
+						field: "username",
+						message:
+							"Username already taken, please choose another..!!",
+						value: username,
+					},
+				],
+			});
+		}
+
 		const newUser = await User.create({ username, email, password });
 
 		const token = jwt.sign({ id: newUser._id }, JWT_SECRET, {
