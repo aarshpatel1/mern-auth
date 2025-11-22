@@ -1,104 +1,59 @@
-import { useState, useContext } from "react";
+import { useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthContext } from "../contexts/AuthContext";
+import { useFormValidation } from "../hooks/useFormValidation";
+import FormField from "../components/FormField";
 
 export default function Login() {
-	const [email, setEmail] = useState("");
-	const [password, setPassword] = useState("");
-	const [fieldErrors, setFieldErrors] = useState({});
-	const [touched, setTouched] = useState({});
 	const navigate = useNavigate();
 	const { login, loading, error } = useContext(AuthContext);
 
-	const validateField = (name, value) => {
-		const errors = [];
-
-		switch (name) {
-			case "email":
-				if (!value.trim()) {
-					errors.push("Email is required");
-				} else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-					errors.push("Invalid email format");
-				} else if (/\s/.test(value)) {
-					errors.push("Email must not contain spaces");
-				}
-				break;
-
-			case "password":
-				if (!value) {
-					errors.push("Password is required");
-				} else if (/\s/.test(value)) {
-					errors.push("Password must not contain spaces");
-				}
-				break;
-		}
-
-		return errors;
-	};
-
-	const handleBlur = (field) => {
-		setTouched({ ...touched, [field]: true });
-		const errors = validateField(field, eval(field));
-		setFieldErrors({ ...fieldErrors, [field]: errors });
-	};
-
-	const handleChange = (field, value) => {
-		if (field === "email") {
-			setEmail(value);
-		} else if (field === "password") {
-			setPassword(value);
-		}
-
-		if (touched[field]) {
-			const errors = validateField(field, value);
-			setFieldErrors({ ...fieldErrors, [field]: errors });
-		}
-	};
+	const {
+		values,
+		fieldErrors,
+		touched,
+		handleBlur,
+		handleChange,
+		validateForm,
+		resetForm,
+		setFieldError,
+	} = useFormValidation(
+		{
+			email: "",
+			password: "",
+		},
+		["email", "loginPassword"]
+	);
 
 	const handleSubmit = async (e) => {
 		e.preventDefault();
 
-		// Mark all fields as touched
-		setTouched({
-			email: true,
-			password: true,
-		});
-
-		// Validate all fields
-		const emailErrors = validateField("email", email);
-		const passwordErrors = validateField("password", password);
-
-		const allErrors = {
-			email: emailErrors,
-			password: passwordErrors,
-		};
-
-		setFieldErrors(allErrors);
-
-		// Check if any errors exist
-		const hasErrors = Object.values(allErrors).some(
-			(errors) => errors.length > 0
-		);
-		if (hasErrors) {
+		if (!validateForm()) {
 			return;
 		}
 
 		try {
 			await login({
-				email: email.trim().toLowerCase(),
-				password,
+				email: values.email.trim().toLowerCase(),
+				password: values.password,
 			});
 			navigate("/dashboard");
-		} catch {
-			// context error shown
+		} catch (err) {
+			// Handle server-side validation errors
+			if (err.response?.data?.errors) {
+				err.response.data.errors.forEach((error) => {
+					const fieldName =
+						error.field === "password"
+							? "loginPassword"
+							: error.field;
+					setFieldError(fieldName, error.messages || [error.message]);
+				});
+			}
 		}
 	};
 
 	const handleReset = () => {
-		setEmail("");
-		setPassword("");
-		setFieldErrors({});
-		setTouched({});
+		resetForm();
 	};
 
 	return (
@@ -114,71 +69,32 @@ export default function Login() {
 			>
 				<h1 className="text-center h3 mb-3">Login</h1>
 
-				<div className="mb-3">
-					<label htmlFor="email" className="form-label">
-						Email
-					</label>
-					<input
-						type="email"
-						className={`form-control ${
-							touched.email && fieldErrors.email?.length > 0
-								? "is-invalid"
-								: touched.email &&
-								  fieldErrors.email?.length === 0
-								? "is-valid"
-								: ""
-						}`}
-						id="email"
-						value={email}
-						onChange={(e) => handleChange("email", e.target.value)}
-						onBlur={() => handleBlur("email")}
-						disabled={loading}
-						required
-					/>
-					{touched.email &&
-						fieldErrors.email?.map((error, index) => (
-							<div
-								key={index}
-								className="invalid-feedback d-block"
-							>
-								{error}
-							</div>
-						))}
-				</div>
+				<FormField
+					label="Email"
+					name="email"
+					type="email"
+					value={values.email}
+					onChange={handleChange}
+					onBlur={handleBlur}
+					errors={fieldErrors.email || []}
+					touched={touched.email}
+					disabled={loading}
+					required
+					autoFocus
+				/>
 
-				<div className="mb-3">
-					<label htmlFor="password" className="form-label">
-						Password
-					</label>
-					<input
-						type="password"
-						className={`form-control ${
-							touched.password && fieldErrors.password?.length > 0
-								? "is-invalid"
-								: touched.password &&
-								  fieldErrors.password?.length === 0
-								? "is-valid"
-								: ""
-						}`}
-						id="password"
-						value={password}
-						onChange={(e) =>
-							handleChange("password", e.target.value)
-						}
-						onBlur={() => handleBlur("password")}
-						disabled={loading}
-						required
-					/>
-					{touched.password &&
-						fieldErrors.password?.map((error, index) => (
-							<div
-								key={index}
-								className="invalid-feedback d-block"
-							>
-								{error}
-							</div>
-						))}
-				</div>
+				<FormField
+					label="Password"
+					name="loginPassword"
+					type="password"
+					value={values.password}
+					onChange={(name, value) => handleChange("password", value)}
+					onBlur={() => handleBlur("loginPassword")}
+					errors={fieldErrors.loginPassword || []}
+					touched={touched.loginPassword}
+					disabled={loading}
+					required
+				/>
 
 				<div className="d-flex align-items-center justify-content-center gap-3">
 					<button
