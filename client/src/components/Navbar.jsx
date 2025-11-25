@@ -37,6 +37,11 @@ function Navbar() {
 								Dashboard
 							</Link>
 						</li>
+						<li className="nav-item">
+							<Link to="/testing" className="nav-link">
+								Testing
+							</Link>
+						</li>
 					</ul>
 					<div className="d-flex align-items-center gap-2">
 						{!isAuthenticated ? (
